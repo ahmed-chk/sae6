@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <link rel="manifest" href="manifest.json" />
+      <link rel="icon" type="image/x-icon" href="./favicon.ico">
+      <link rel="stylesheet" href="https://unpkg.com/onsenui/css/onsenui.css">
+      <link rel="stylesheet" href="https://unpkg.com/onsenui/css/onsen-css-components.min.css">
+      <script src="https://unpkg.com/onsenui/js/onsenui.min.js"></script>
+      <script src="html5-qrcode.min.js"></script>
+      <title>Les Jardins de Cocagne</title>
+      <style>
+          body {
+              font-family: Arial, sans-serif;
+              background-color: #f3f3f3;
+              margin: 0;
+              padding: 0;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              height: 100vh;
+          }
+          .container {
+              text-align: center;
+              background-color: #fff;
+              padding: 20px;
+              border-radius: 10px;
+              box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1);
+          }
+          .logo {
+              max-width: 100%;
+              height: auto;
+              margin-bottom: 20px;
+          }
+          h1 {
+              margin-bottom: 20px;
+              color: #007bff;
+          }
+          select {
+              padding: 10px;
+              font-size: 16px;
+              width: 80%;
+              max-width: 300px;
+              margin-bottom: 20px;
+              border: 2px solid #007bff;
+              border-radius: 5px;
+              outline: none;
+          }
+          button {
+              padding: 10px 20px;
+              font-size: 16px;
+              background-color: #007bff;
+              color: #fff;
+              border: none;
+              border-radius: 5px;
+              cursor: pointer;
+              transition: background-color 0.3s ease;
+          }
+          button:hover {
+              background-color: #0056b3;
+          }
+      </style>
+  </head>
+  <body>
+    <ons-navigator swipeable id="myNavigator" page="home.html"></ons-navigator>
+
+    <template id="home.html">
+      <ons-page id="home">
+        <div class="container">
+            <img src="./photos/cocagne-vert.png" alt="Logo des Jardins de Cocagne" class="logo">
+            <h1>Les Jardins de Cocagne</h1>
+            <p>Choisissez une tournée :</p>
+            <ons-select id="choose-sel">
+            </ons-select>
+            <button onclick="document.querySelector('#myNavigator').pushPage('page1.html')">Afficher les dépôts</button>
+        </div>
+      </ons-page>
+    </template>
+
+    <template id="page1.html">
+      <ons-page id="page1">
+        <ons-toolbar>
+          <div class="left"><ons-back-button>Tournées</ons-back-button></div>
+          <div class="center">Dépots de la tournée</div>
+        </ons-toolbar>
+        <ons-list id="depotsList">
+        </ons-list>
+      </ons-page>
+    </template>
+
+    <template id="page2.html">
+      <ons-page id="page2">
+        <ons-toolbar>
+          <div class="left"><ons-back-button>Dépots</ons-back-button></div>
+          <div class="center"></div>
+        </ons-toolbar>
+        <ons-list id="paniersList">
+        </ons-list>
+      </ons-page>
+    </template>
+
+    <template id="page3.html">
+      <ons-page id="page3">
+        <ons-toolbar>
+          <div class="left"><ons-back-button>Paniers</ons-back-button></div>
+          <div class="center"></div>
+        </ons-toolbar>
+        <div id="reader"></div>
+        <div id="qrcode"></div>
+      </ons-page>
+    </template>
+
+    <script>
+        document.addEventListener('init', function(event) {
+          var page = event.target;
+
+          if (page.id === 'page1') {
+            getDepots();
+          }
+          else if (page.id === 'page2') {
+            page.querySelector('ons-toolbar .center').innerHTML = page.data.title;
+            getPaniers(page);
+          }
+          else if (page.id === 'page3') {
+            scan(page);
+          }
+        });
+
+        headers = {
+          headers: {
+            "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0cGFxcGlrcWFybnZldGljcWhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDQwNDQ3MzUsImV4cCI6MjAxOTYyMDczNX0.4glNGKdXcHAXUyWuO5fpvcmg4oRyH9TvtTZ7OYMkcfc"
+          }
+        }
+
+        function afficherDepots() {
+          document.querySelector('#myNavigator').pushPage('page1.html');
+        }
+
+        function addOption(tournee) {
+          const option = document.createElement('option');
+          option.value = tournee.tournee_id;
+          option.textContent = tournee.tournee;
+          document.getElementById('choose-sel').add(option);
+        }
+
+        function getCurrentWeek() {
+          const currentDate = new Date();
+
+          const dayOfYear = (Date.UTC(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate()) - Date.UTC(currentDate.getFullYear(), 0, 0)) / 24 / 60 / 60 / 1000;
+
+          const weekNumber = Math.ceil((dayOfYear + 1) / 7);
+
+          return weekNumber;
+        }
+
+        async function getTournees(){
+          await fetch('https://ytpaqpikqarnveticqhl.supabase.co/rest/v1/tournees?jardin_id=eq.2', headers)
+              .then(response => response.json())
+              .then(data => {
+                  data.forEach(tournee => {
+                    addOption(tournee)
+                  });
+              })
+              .catch(error => {
+                  console.error('Erreur lors de la récupération des tournées :', error);
+              });
+        }
+
+        async function getDepots() {
+            const selectedTournee = document.getElementById('choose-sel').value;
+
+            const depotsListContainer = document.getElementById("depotsList");
+
+            const jsonData = { "tournee_id": selectedTournee, "semaine": getCurrentWeek() };
+            const url = 'https://ytpaqpikqarnveticqhl.supabase.co/functions/v1/tournees';
+
+            await fetch(url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl0cGFxcGlrcWFybnZldGljcWhsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDQwNDQ3MzUsImV4cCI6MjAxOTYyMDczNX0.4glNGKdXcHAXUyWuO5fpvcmg4oRyH9TvtTZ7OYMkcfc"
+              },
+              body: JSON.stringify(jsonData)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    data[0].distribution.forEach(depot => {
+                      const listItem = document.createElement("ons-list-item");
+                      listItem.addEventListener('click', () => {
+                        document.querySelector("#myNavigator").pushPage('page2.html', {
+                        data: { 
+                          title: `${depot.depot}`,
+                          livraisons: depot.livraisons,
+                          depot_id: depot.depot_id
+                        } });
+                      });
+                      
+                      let ps = 0;
+                      let pfa = 0;
+                      let pfr = 0;
+
+                      depot.livraisons.forEach(panier => {
+                        if (panier.panier_id == 1 || panier.panier_id == 2) ps += parseInt(panier.count);
+                        else if (panier.panier_id == 3 || panier.panier_id == 4) pfa += parseInt(panier.count);
+                        else if (panier.panier_id == 5 || panier.panier_id == 6) pfr += parseInt(panier.count);
+                      });
+          
+                      listItem.innerHTML = `${depot.depot}<br>PS : ${ps} / PFA : ${pfa} / PFR : ${pfr}`;
+                      depotsListContainer.appendChild(listItem);
+                    });
+                })
+                .catch(error => {
+                    console.error('Erreur lors de la récupération des dépôts :', error);
+                });
+        }
+
+        function getPaniers(page){
+          const listPaniers = page.data.livraisons;
+
+          const paniersListContainer = document.getElementById("paniersList");
+
+          listPaniers.forEach(panier => {
+            panier.adherents.forEach(adherent => {
+              const listItem = document.createElement("ons-list-item");
+              const livraisonStatus = page.scan ? " - Livré" : "";
+              listItem.textContent = `${panier.panier} pour l'adhérent : ${adherent}${livraisonStatus}`;
+              paniersListContainer.appendChild(listItem);
+
+              listItem.addEventListener('click', () => {
+                document.querySelector("#myNavigator").pushPage('page3.html', {
+                  data: {
+                    panier: panier,
+                    adherent: adherent,
+                    depot_id: page.data.depot_id
+                  } 
+                });
+              });
+            });
+          });
+        }
+
+        function scan(page){
+          const html5QrCode = new Html5Qrcode(
+            "reader", { formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ] });
+          const qrCodeSuccessCallback = (decodedText, decodedResult) => {
+            const selectedTournee = document.getElementById('choose-sel').value;
+            const selectedDepot = page.data.depot_id;
+            const selectedAdherent = page.data.adherent;
+            const selectedPanier = page.data.panier.panier_id;
+
+            const infosPanier = decodedText.split("-");
+           
+            if (selectedTournee == infosPanier[0] && selectedDepot == infosPanier[1]
+                && selectedAdherent == infosPanier[2] && selectedPanier == infosPanier[3]) {
+                document.getElementById("qrcode").innerHTML = "Scan validé";
+            }
+            else {
+              document.getElementById("qrcode").innerHTML = "Veuillez scanner le bon QR Code.";
+            }
+          };
+          const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+          html5QrCode.start({ facingMode: "user" }, config, qrCodeSuccessCallback);
+        }
+
+        getTournees();
+    </script>
+  </body>
+</html>
